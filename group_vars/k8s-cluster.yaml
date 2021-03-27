@@ -1,0 +1,4 @@
+---
+arch: arm64
+node_ip: "{{ ansible_facts.eth0.ipv4.address }}"
+hostname: "{{ ansible_facts.hostname }}"

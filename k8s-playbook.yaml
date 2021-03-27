@@ -1,0 +1,9 @@
+---
+- name: Create k8s cluster
+  hosts: local
+  become: true
+  roles:
+    - role: etcd
+      tags:
+        - etcd
+

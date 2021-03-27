@@ -1,0 +1,69 @@
+---
+- name: Check if a etcd exists
+  stat:
+    path: /usr/local/bin/etcd
+  register: etcd_register
+
+- name: Check if a etcdctl exists
+  stat:
+    path: /usr/local/bin/etcdctl
+  register: etcdctl_register
+
+- when: not (etcd_register.stat.exists and etcdctl_register.stat.exists)
+  block:
+    - name: Create temporary directory
+      tempfile:
+        state: directory
+      register: remote_tmp
+
+    - name: Download etcd
+      unarchive:
+        src: https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-{{ arch }}.tar.gz
+        dest: "{{ remote_tmp.path }}"
+        remote_src: True
+
+    - name: Copy etcd binary
+      copy:
+        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}/etcd"
+        dest: /usr/local/bin
+        remote_src: True
+        mode: 0755
+
+    - name: Copy etcdctl binary
+      copy:
+        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}/etcdctl"
+        dest: /usr/local/bin
+        remote_src: True
+        mode: 0755
+
+- name: Create /etc/etcd
+  file:
+    path: /etc/etcd
+    state: directory
+    mode: 0600
+  register: remote_etc_etcd
+
+- name: Create /var/lib/etcd
+  file:
+    path: /var/lib/etcd
+    state: directory
+    mode: 0600
+  register: remote_var_lib_etcd
+
+- name: Copy certification
+  copy:
+    src: "{{ item }}"
+    dest: "{{ remote_etc_etcd.path }}"
+    mode: 0600
+  with_list:
+    - etcd-ca.pem
+    - etcd-ca-key.pem
+    - kube-etcd.pem
+    - kube-etcd-key.pem
+    - kube-etcd-peer.pem
+    - kube-etcd-peer-key.pem
+
+- name: Configure etcd.service
+  template:
+    src: etcd.service.j2
+    dest: /etc/systemd/system/etcd.service
