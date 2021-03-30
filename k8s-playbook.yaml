@@ -1,6 +1,6 @@
 ---
 - name: Create k8s cluster
-  hosts: local
+  hosts: k8s_master
   become: true
   roles:
     - role: etcd
