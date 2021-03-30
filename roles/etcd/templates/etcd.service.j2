@@ -4,23 +4,23 @@ Documentation=https://github.com/etcd-io
 
 [Service]
 Type=notify
-ExecStart=/usr/local/bin/etcd \\
-  --name {{ hostname }} \\
-  --cert-file=/etc/etcd/kube-etcd.pem \\
-  --key-file=/etc/etcd/kube-etcd-key.pem \\
-  --peer-cert-file=/etc/etcd/kube-etcd-peer.pem \\
-  --peer-key-file=/etc/etcd/kube-etcd-peer-key.pem \\
-  --trusted-ca-file=/etc/etcd/etcd-ca.pem \\
-  --peer-trusted-ca-file=/etc/etcd/etcd-ca.pem \\
-  --peer-client-cert-auth \\
-  --client-cert-auth \\
-  --initial-advertise-peer-urls https://{{ node_ip }}:2380 \\
-  --listen-peer-urls https://{{ node_ip }}:2380 \\
-  --listen-client-urls https://{{ node_ip }}:2379,https://127.0.0.1:2379 \\
-  --advertise-client-urls https://{{ node_ip }}:2379 \\
-  --initial-cluster-token etcd-initial-token \\
-  --initial-cluster {{ hostname }}=https://{{ node_ip }}:2380 \\
-  --initial-cluster-state new \\
+ExecStart=/usr/local/bin/etcd \
+  --name {{ hostname }} \
+  --cert-file=/etc/etcd/kube-etcd.pem \
+  --key-file=/etc/etcd/kube-etcd-key.pem \
+  --peer-cert-file=/etc/etcd/kube-etcd-peer.pem \
+  --peer-key-file=/etc/etcd/kube-etcd-peer-key.pem \
+  --trusted-ca-file=/etc/etcd/etcd-ca.pem \
+  --peer-trusted-ca-file=/etc/etcd/etcd-ca.pem \
+  --peer-client-cert-auth \
+  --client-cert-auth \
+  --initial-advertise-peer-urls https://{{ node_ip }}:2380 \
+  --listen-peer-urls https://{{ node_ip }}:2380 \
+  --listen-client-urls https://{{ node_ip }}:2379,https://127.0.0.1:2379 \
+  --advertise-client-urls https://{{ node_ip }}:2379 \
+  --initial-cluster-token etcd-initial-token \
+  --initial-cluster {{ hostname }}=https://{{ node_ip }}:2380 \
+  --initial-cluster-state new \
   --data-dir=/var/lib/etcd
 Restart=on-failure
 RestartSec=5
