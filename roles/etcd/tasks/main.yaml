@@ -62,8 +62,23 @@
     - kube-etcd-key.pem
     - kube-etcd-peer.pem
     - kube-etcd-peer-key.pem
+    - kube-etcd-healthcheck-client.pem
+    - kube-etcd-healthcheck-client-key.pem
 
 - name: Configure etcd.service
   template:
     src: etcd.service.j2
     dest: /etc/systemd/system/etcd.service
+
+- name: Run etcd service
+  systemd:
+    name: etcd
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+
+- name: Verify etcd service
+  service_facts:
+  failed_when: ansible_facts["services"]["etcd.service"].state != "running"
+
