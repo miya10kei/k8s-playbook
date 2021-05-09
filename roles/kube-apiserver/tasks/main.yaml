@@ -1,0 +1,46 @@
+---
+- name: Check if a kube-apiserver exists
+  stat:
+    path: /usr/local/bin/kube-apiserver
+  register: kube_apiserver_register
+
+- name: Download kube-apiserver
+  get_url:
+    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kube_apiserver_version }}/bin/linux/{{ arch }}/kube-apiserver
+    dest: /usr/local/bin/kube-apiserver
+    mode: 0755
+  when: not kube_apiserver_register.stat.exists
+
+- name: Create /var/lib/kubernetes
+  file:
+    path: /var/lib/kubernetes
+    state: directory
+    mode: 0600
+  register: remote_var_lib_kubernetes
+
+- name: Generate secret
+  shell: head -c 32 /dev/urandom | base64
+  register: secret_register
+
+- name: Configure encription-config.yaml
+  template:
+    src: encription-config.yaml.j2
+    dest: /var/lib/kubernetes/encription-config.yaml
+
+- name: Create /var/lib/kubernetes
+  file:
+    path: /var/lib/kubernetes
+    state: directory
+    mode: 0600
+  register: remote_var_lib_kubernetes
+
+- name: Copy certification
+  copy:
+    src: "{{ item }}"
+    dest: "{{ remote_etc_etcd.path }}"
+    mode: 0600
+  with_list:
+    - kubernetes-ca.pem
+    - kube-apiserver-etcd-client.pem
+    - kube-apiserver-etcd-client-key.pem
+

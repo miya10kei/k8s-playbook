@@ -2,3 +2,6 @@
 arch: arm64
 node_ip: "{{ ansible_facts.eth0.ipv4.address }}"
 hostname: "{{ ansible_facts.hostname }}"
+cluster_ip_range: 10.20.0.0/24
+masters: "{{ groups['k8s_master'] }}"
+workers: "{{ groups['k8s_worker'] }}"
