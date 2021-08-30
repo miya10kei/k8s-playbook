@@ -1,7 +1,12 @@
 ---
-arch: arm64
+arch: arm
 node_ip: "{{ ansible_facts.eth0.ipv4.address }}"
 hostname: "{{ ansible_facts.hostname }}"
-cluster_ip_range: 10.20.0.0/24
+cluster_ip_range: 10.32.0.0/24
+pod_ip_range: 10.10.0.0/16
 masters: "{{ groups['k8s_master'] }}"
 workers: "{{ groups['k8s_worker'] }}"
+etcd_version: 3.4.16
+kubernetes_version: 1.21.4
+crictl_version: 1.21.0
+cni_plugins_version: 1.0.0

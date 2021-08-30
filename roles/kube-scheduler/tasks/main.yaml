@@ -1,0 +1,66 @@
+---
+- name: Check if a kube-scheduler exists
+  stat:
+    path: /usr/local/bin/kube-scheduler
+  register: kube_scheduler_register
+
+- name: Download kube-scheduler
+  get_url:
+    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-scheduler
+    dest: /usr/local/bin/kube-scheduler
+    mode: 0755
+  when: not kube_scheduler_register.stat.exists
+
+- name: Create /var/lib/kubernetes
+  file:
+    path: /var/lib/kubernetes
+    state: directory
+    mode: 0600
+  register: remote_var_lib_kubernetes
+
+- name: Copy kubeconfig
+  copy:
+    src: "{{ item }}"
+    dest: "{{ remote_var_lib_kubernetes.path }}"
+    mode: 0600
+  with_list:
+    - ../../../files/kube-scheduler.kubeconfig
+
+- name: Create /etc/kubernetes/config
+  file:
+    path: /etc/kubernetes/config
+    state: directory
+    mode: 0600
+  register: remote_etc_kubernetes_config
+
+- name: Copy configuration files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ remote_etc_kubernetes_config.path }}"
+    mode: 0600
+  with_list:
+    - ../../../files/kube-scheduler.yaml
+
+- name: Copy service
+  copy:
+    src: "{{ item }}"
+    dest: /etc/systemd/system/
+    mode: 0644
+  with_list:
+    - ../../../files/kube-scheduler.service
+
+- name: Run kube-scheduler service
+  systemd:
+    name: kube-scheduler
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+
+- name: Gather service
+  service_facts:
+
+- name: Verify kube-scheduler service
+  fail:
+    msg: 'kube-scheduler is not running!!!'
+  when: ansible_facts["services"]["kube-scheduler.service"].state != "running"

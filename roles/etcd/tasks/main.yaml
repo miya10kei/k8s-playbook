@@ -18,20 +18,20 @@
 
     - name: Download etcd
       unarchive:
-        src: https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-{{ arch }}.tar.gz
+        src: https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-{{ arch }}64.tar.gz
         dest: "{{ remote_tmp.path }}"
         remote_src: True
 
     - name: Copy etcd binary
       copy:
-        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}/etcd"
+        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}64/etcd"
         dest: /usr/local/bin
         remote_src: True
         mode: 0755
 
     - name: Copy etcdctl binary
       copy:
-        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}/etcdctl"
+        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}64/etcdctl"
         dest: /usr/local/bin
         remote_src: True
         mode: 0755
@@ -40,14 +40,14 @@
   file:
     path: /etc/etcd
     state: directory
-    mode: 0600
+    mode: 0755
   register: remote_etc_etcd
 
 - name: Create /var/lib/etcd
   file:
     path: /var/lib/etcd
     state: directory
-    mode: 0600
+    mode: 0755
   register: remote_var_lib_etcd
 
 - name: Copy certification
@@ -56,14 +56,14 @@
     dest: "{{ remote_etc_etcd.path }}"
     mode: 0600
   with_list:
-    - etcd-ca.pem
-    - etcd-ca-key.pem
-    - kube-etcd.pem
-    - kube-etcd-key.pem
-    - kube-etcd-peer.pem
-    - kube-etcd-peer-key.pem
-    - kube-etcd-healthcheck-client.pem
-    - kube-etcd-healthcheck-client-key.pem
+    - ../../../files/etcd-ca.pem
+    - ../../../files/etcd-ca-key.pem
+    - ../../../files/kube-etcd.pem
+    - ../../../files/kube-etcd-key.pem
+    - ../../../files/kube-etcd-peer.pem
+    - ../../../files/kube-etcd-peer-key.pem
+    - ../../../files/kube-etcd-healthcheck-client.pem
+    - ../../../files/kube-etcd-healthcheck-client-key.pem
 
 - name: Configure etcd.service
   template:
@@ -78,7 +78,10 @@
     daemon_reload: true
   register: result
 
-- name: Verify etcd service
+- name: Gather services
   service_facts:
-  failed_when: ansible_facts["services"]["etcd.service"].state != "running"
 
+- name: Verify etcd service
+  fail:
+    msg: 'etcd is not running!!!'
+  when: ansible_facts["services"]["etcd.service"].state != "running"

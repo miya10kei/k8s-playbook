@@ -6,7 +6,7 @@
 
 - name: Download kube-apiserver
   get_url:
-    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kube_apiserver_version }}/bin/linux/{{ arch }}/kube-apiserver
+    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-apiserver
     dest: /usr/local/bin/kube-apiserver
     mode: 0755
   when: not kube_apiserver_register.stat.exists
@@ -22,25 +22,44 @@
   shell: head -c 32 /dev/urandom | base64
   register: secret_register
 
-- name: Configure encription-config.yaml
+- name: Configure encryption-config.yaml
   template:
-    src: encription-config.yaml.j2
-    dest: /var/lib/kubernetes/encription-config.yaml
-
-- name: Create /var/lib/kubernetes
-  file:
-    path: /var/lib/kubernetes
-    state: directory
-    mode: 0600
-  register: remote_var_lib_kubernetes
+    src: encryption-config.yaml.j2
+    dest: /var/lib/kubernetes/encryption-config.yaml
 
 - name: Copy certification
   copy:
     src: "{{ item }}"
-    dest: "{{ remote_etc_etcd.path }}"
+    dest: "{{ remote_var_lib_kubernetes.path }}"
     mode: 0600
   with_list:
-    - kubernetes-ca.pem
-    - kube-apiserver-etcd-client.pem
-    - kube-apiserver-etcd-client-key.pem
+    - ../../../files/kubernetes-ca.pem
+    - ../../../files/kube-apiserver-etcd-client-key.pem
+    - ../../../files/kube-apiserver-etcd-client.pem
+    - ../../../files/kube-apiserver-kubelet-client.pem
+    - ../../../files/kube-apiserver-kubelet-client-key.pem
+    - ../../../files/service-account.pem
+    - ../../../files/service-account-key.pem
+    - ../../../files/kube-apiserver.pem
+    - ../../../files/kube-apiserver-key.pem
 
+- name: Configure kube-apiserver.service
+  template:
+    src: kube-apiserver.service.j2
+    dest: /etc/systemd/system/kube-apiserver.service
+
+- name: Run kube-apiserver service
+  systemd:
+    name: kube-apiserver
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+
+- name: Gather service
+  service_facts:
+
+- name: Verify kube-apiserver service
+  fail:
+    msg: 'kube-apiserver is not running!!!'
+  when: ansible_facts["services"]["kube-apiserver.service"].state != "running"

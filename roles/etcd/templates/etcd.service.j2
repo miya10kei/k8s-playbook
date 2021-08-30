@@ -24,7 +24,7 @@ ExecStart=/usr/local/bin/etcd \
   --data-dir=/var/lib/etcd
 Restart=on-failure
 RestartSec=5
-Environment=ETCD_UNSUPPORTED_ARCH={{ arch }}
+Environment=ETCD_UNSUPPORTED_ARCH={{ arch }}64
 
 [Install]
 WantedBy=multi-user.target
