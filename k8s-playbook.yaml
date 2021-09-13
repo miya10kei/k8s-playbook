@@ -3,9 +3,9 @@
   hosts: k8s_cluster
   become: true
   roles:
-    - role: common
+    - role: debian
       tags:
-        - upgrade
+        - maintenance
 
 - name: Create k8s master
   hosts: k8s_master
@@ -14,15 +14,19 @@
     - role: etcd
       tags:
         - etcd
+        - masters
     - role: kube-apiserver
       tags:
         - kube-apiserver
+        - masters
     - role: kube-controller-manager
       tags:
         - kube-controller-manager
+        - masters
     - role: kube-scheduler
       tags:
         - kube-scheduler
+        - masters
 
 - name: Create k8s worker
   hosts: k8s_worker

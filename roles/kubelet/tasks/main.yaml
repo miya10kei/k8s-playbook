@@ -1,81 +1,60 @@
 ---
-- name: Create each directories
+- name: Create directories
   file:
     path: "{{ item }}"
     state: directory
-    mode: 0644
-  with_list:
+    mode: "0755"
+  loop:
     - /etc/cni/net.d
     - /etc/containerd
     - /opt/cni/bin
     - /var/lib/kubelet
     - /var/lib/kubernetes
 
-- name: Copy key to /var/lib/kubelet
+- name: Deploy a certificate and a key
   copy:
     src: "{{ item }}"
     dest: /var/lib/kubelet/
-    mode: 0644
-  with_list:
-    - ../../../files/{{ hostname }}.pem
-    - ../../../files/{{ hostname }}-key.pem
+    mode: "0600"
+  loop:
+    - ../../../files/certificates/{{ hostname }}.pem
+    - ../../../files/certificates/{{ hostname }}-key.pem
 
-- name: Copy configuration to /var/lib/kubelet/kubeconfig
+- name: Deploy a kubeconfig file
   copy:
-    src: "{{ item }}"
+    src: ../../../files/kubeconfigs/{{ hostname }}.kubeconfig
     dest: /var/lib/kubelet/kubeconfig
-    mode: 0644
-  with_list:
-    - ../../../files/{{ hostname }}.kubeconfig
+    mode: "0600"
 
-- name: Copy certification to /var/lib/kubernetes
+- name: Deploy a certificate
   copy:
-    src: "{{ item }}"
+    src: ../../../files/certificates/kubernetes-ca.pem
     dest: /var/lib/kubernetes/
-    mode: 0644
-  with_list:
-    - ../../../files/kubernetes-ca.pem
+    mode: "0600"
 
-# kubelet
-- name: Check if a kubelet exists
-  stat:
-    path: /usr/local/bin/kubelet
-  register: kubelet_register
-
-- name: Download kubelet
+- name: Deploy kubelet
   get_url:
-    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}64/kubelet
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}64/kubelet"
+    dest: /usr/local/bin/kubelet
+    mode: "0755"
+
+- name: Deploy crictl
+  unarchive:
+    src: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-{{ arch }}64.tar.gz"
     dest: /usr/local/bin/
-    mode: 0755
+    mode: "0755"
     owner: root
     group: root
-  when: not kubelet_register.stat.exists
+    remote_src: "yes"
 
-# containerd
-- name: Check if a crictl exists
-  stat:
-    path: /usr/local/bin/crictl
-  register: crictl_register
-
-- name: Download crictl
+- name: Deploy cni plugins
   unarchive:
-    src: https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-{{ arch }}64.tar.gz
-    dest: /usr/local/bin/
-    remote_src: True
-    mode: 0755
-    owner: root
-    group: root
-  when: not crictl_register.stat.exists
-
-- name: Download cni plugins
-  unarchive:
-    src: https://github.com/containernetworking/plugins/releases/download/v{{ cni_plugins_version }}/cni-plugins-linux-{{ arch }}64-v{{ cni_plugins_version }}.tgz
+    src: "https://github.com/containernetworking/plugins/releases/download/v{{ cni_plugins_version }}/cni-plugins-linux-{{ arch }}64-v{{ cni_plugins_version }}.tgz"
     dest: /opt/cni/bin/
-    remote_src: True
-    mode: 0755
+    mode: "0755"
     owner: root
     group: root
-  when: not crictl_register.stat.exists
+    remote_src: "yes"
 
 - name: Install containerd & runc
   apt:
@@ -84,57 +63,41 @@
       - containerd
       - runc
 
-- name: Configure 10-bridge.conf
+- name: Deploy a cni bridge configuration file
   template:
-    src: "{{ item }}"
+    src: 10-bridge.conf.j2
     dest: /etc/cni/net.d/10-bridge.conf
-  with_list:
-    - 10-bridge.conf.j2
+    mode: "0744"
 
-- name: Copy 99-loopback.conf
+- name: Deploy a cni loopback configuration file
   copy:
-    src: "{{ item }}"
-    dest: /etc/cni/net.d/
-    force: yes
-  with_list:
-    - 99-loopback.conf
+    src: 99-loopback.conf
+    dest: /etc/cni/net.d/99-loopback.conf
+    mode: "0744"
 
-- name: Copy config.toml
+- name: Deploy a containerd configuration file
   copy:
-    src: "{{ item }}"
-    dest: /etc/containerd/
-    force: yes
-  with_list:
-    - config.toml
+    src: config.toml
+    dest: /etc/containerd/config.toml
+    mode: "0744"
 
-- name: Configure kubelet-config.yaml
+- name: Deploy a kubelet configuration file
   template:
-    src: "{{ item }}"
+    src: kubelet-config.yaml.j2
     dest: /var/lib/kubelet/kubelet-config.yaml
-    force: yes
-  with_list:
-    - kubelet-config.yaml.j2
+    mode: "0744"
 
-- name: Copy kubelet.service
+- name: Deploy a unit file kubelet.service
   copy:
-    src: "{{ item }}"
-    dest: /etc/systemd/system/
-    force: yes
-  with_list:
-    - kubelet.service
+    src: kubelet.service
+    dest: /etc/systemd/system/kubelet.service
+    mode: "0755"
 
-- name: Run kubelet service
+- name: Restart kubelet
   systemd:
     name: kubelet
     state: restarted
     enabled: true
     daemon_reload: true
   register: result
-
-- name: Gather service
-  service_facts:
-
-- name: Verify kubelet service
-  fail:
-    msg: 'kubelet is not running!!!'
-  when: ansible_facts["services"]["kubelet.service"].state != "running"
+  failed_when: not result.state == "started"

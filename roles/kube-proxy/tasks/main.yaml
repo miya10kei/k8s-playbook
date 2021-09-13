@@ -1,53 +1,39 @@
 ---
-- name: Create /var/lib/kube-proxy
+- name: Create a directory
   file:
-    path: /var/lib/kube-proxy
     state: directory
-    mode: 0644
-
-- name: Check if a kube-proxy exists
-  stat:
-    path: /usr/local/bin/kube-proxy
-  register: kube_proxy_register
+    path: /var/lib/kube-proxy
+    mode: "0755"
 
 - name: Download kube-proxy
   get_url:
-    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}64/kube-proxy
-    dest: /usr/local/bin/
-    mode: 0755
-    owner: root
-    group: root
-  when: not kube_proxy_register.stat.exists
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}64/kube-proxy"
+    dest: /usr/local/bin/kube-proxy
+    mode: "0755"
 
-- name: Copy kubeconfig
+- name: Deploy a kubeconfig file
   copy:
-    src: ../../../files/kube-proxy.kubeconfig
+    src: ../../../files/kubeconfigs/kube-proxy.kubeconfig
     dest: /var/lib/kube-proxy/kubeconfig
-    mode: 0644
+    mode: "0600"
 
-- name: Configure kube-proxy-config.yaml
+- name: Deploy a kube-proxy configuration file
   template:
     src: kube-proxy-config.yaml
     dest: /var/lib/kube-proxy/kube-proxy-config.yaml
+    mode: "0744"
 
-- name: Copy kube-proxy.service
+- name: Deploy a unit file
   copy:
     src: kube-proxy.service
     dest: /etc/systemd/system/kube-proxy.service
-    force: yes
+    mode: "0755"
 
-- name: Run kube-proxy service
+- name: Restar kube-proxy
   systemd:
     name: kube-proxy
     state: restarted
     enabled: true
     daemon_reload: true
   register: result
-
-- name: Gather service
-  service_facts:
-
-- name: Verify kube-proxy service
-  fail:
-    msg: 'kube-proxy is not running!!!'
-  when: ansible_facts["services"]["kube-proxy.service"].state != "running"
+  failed_when: not result.state == "started"

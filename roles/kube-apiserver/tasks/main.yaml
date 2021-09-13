@@ -1,65 +1,54 @@
 ---
-- name: Check if a kube-apiserver exists
-  stat:
-    path: /usr/local/bin/kube-apiserver
-  register: kube_apiserver_register
-
-- name: Download kube-apiserver
-  get_url:
-    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-apiserver
-    dest: /usr/local/bin/kube-apiserver
-    mode: 0755
-  when: not kube_apiserver_register.stat.exists
-
-- name: Create /var/lib/kubernetes
+- name: Create a directory
   file:
-    path: /var/lib/kubernetes
     state: directory
-    mode: 0600
-  register: remote_var_lib_kubernetes
+    path: /var/lib/kubernetes
+    mode: "0755"
+
+- name: Deploy kube-apiserver
+  get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-apiserver"
+    dest: /usr/local/bin/kube-apiserver
+    mode: "0755"
+
+- name: Deploy certificates and private keys
+  copy:
+    src: "{{ item }}"
+    dest: /var/lib/kubernetes/
+    mode: "0600"
+  loop:
+    - ../../../files/certificates/kubernetes-ca.pem
+    - ../../../files/certificates/kubernetes-ca-key.pem
+    - ../../../files/certificates/kube-apiserver-etcd-client-key.pem
+    - ../../../files/certificates/kube-apiserver-etcd-client.pem
+    - ../../../files/certificates/kube-apiserver-kubelet-client.pem
+    - ../../../files/certificates/kube-apiserver-kubelet-client-key.pem
+    - ../../../files/certificates/service-account.pem
+    - ../../../files/certificates/service-account-key.pem
+    - ../../../files/certificates/kube-apiserver.pem
+    - ../../../files/certificates/kube-apiserver-key.pem
 
 - name: Generate secret
   shell: head -c 32 /dev/urandom | base64
   register: secret_register
 
-- name: Configure encryption-config.yaml
+- name: Deploy a encryption configuration file
   template:
     src: encryption-config.yaml.j2
     dest: /var/lib/kubernetes/encryption-config.yaml
+    mode: "0600"
 
-- name: Copy certification
-  copy:
-    src: "{{ item }}"
-    dest: "{{ remote_var_lib_kubernetes.path }}"
-    mode: 0600
-  with_list:
-    - ../../../files/kubernetes-ca.pem
-    - ../../../files/kube-apiserver-etcd-client-key.pem
-    - ../../../files/kube-apiserver-etcd-client.pem
-    - ../../../files/kube-apiserver-kubelet-client.pem
-    - ../../../files/kube-apiserver-kubelet-client-key.pem
-    - ../../../files/service-account.pem
-    - ../../../files/service-account-key.pem
-    - ../../../files/kube-apiserver.pem
-    - ../../../files/kube-apiserver-key.pem
-
-- name: Configure kube-apiserver.service
+- name: Deploy a unit file
   template:
     src: kube-apiserver.service.j2
     dest: /etc/systemd/system/kube-apiserver.service
+    mode: "0755"
 
-- name: Run kube-apiserver service
+- name: Restart kube-apiserver
   systemd:
     name: kube-apiserver
     state: restarted
     enabled: true
     daemon_reload: true
   register: result
-
-- name: Gather service
-  service_facts:
-
-- name: Verify kube-apiserver service
-  fail:
-    msg: 'kube-apiserver is not running!!!'
-  when: ansible_facts["services"]["kube-apiserver.service"].state != "running"
+  failed_when: not result.state == "started"

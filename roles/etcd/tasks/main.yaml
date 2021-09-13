@@ -1,87 +1,53 @@
 ---
-- name: Check if a etcd exists
-  stat:
-    path: /usr/local/bin/etcd
-  register: etcd_register
-
-- name: Check if a etcdctl exists
-  stat:
-    path: /usr/local/bin/etcdctl
-  register: etcdctl_register
-
-- when: not (etcd_register.stat.exists and etcdctl_register.stat.exists)
-  block:
-    - name: Create temporary directory
-      tempfile:
-        state: directory
-      register: remote_tmp
-
-    - name: Download etcd
-      unarchive:
-        src: https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-{{ arch }}64.tar.gz
-        dest: "{{ remote_tmp.path }}"
-        remote_src: True
-
-    - name: Copy etcd binary
-      copy:
-        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}64/etcd"
-        dest: /usr/local/bin
-        remote_src: True
-        mode: 0755
-
-    - name: Copy etcdctl binary
-      copy:
-        src: "{{ remote_tmp.path }}/etcd-v{{ etcd_version }}-linux-{{ arch }}64/etcdctl"
-        dest: /usr/local/bin
-        remote_src: True
-        mode: 0755
-
-- name: Create /etc/etcd
+- name: Create directories
   file:
-    path: /etc/etcd
     state: directory
-    mode: 0755
-  register: remote_etc_etcd
+    path: "{{ item }}"
+    mode: "0755"
+  loop:
+    - /etc/etcd
+    - /var/lib/etcd
 
-- name: Create /var/lib/etcd
-  file:
-    path: /var/lib/etcd
-    state: directory
-    mode: 0755
-  register: remote_var_lib_etcd
+- name: Deploy binaries
+  unarchive:
+    src: "https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-{{ arch }}64.tar.gz"
+    dest: /usr/local/bin/
+    mode: "0755"
+    owner: root
+    group: root
+    remote_src: "yes"
+    extra_opts:
+      - -z
+      - --strip-components=1
+      - etcd-v{{ etcd_version }}-linux-{{ arch }}64/etcd
+      - etcd-v{{ etcd_version }}-linux-{{ arch }}64/etcdctl
 
-- name: Copy certification
+- name: Deploy certificates and private keys
   copy:
     src: "{{ item }}"
-    dest: "{{ remote_etc_etcd.path }}"
-    mode: 0600
-  with_list:
-    - ../../../files/etcd-ca.pem
-    - ../../../files/etcd-ca-key.pem
-    - ../../../files/kube-etcd.pem
-    - ../../../files/kube-etcd-key.pem
-    - ../../../files/kube-etcd-peer.pem
-    - ../../../files/kube-etcd-peer-key.pem
-    - ../../../files/kube-etcd-healthcheck-client.pem
-    - ../../../files/kube-etcd-healthcheck-client-key.pem
+    dest: /etc/etcd/
+    mode: "0600"
+  loop:
+    - ../../../files/certificates/etcd-ca.pem
+    - ../../../files/certificates/etcd-ca-key.pem
+    - ../../../files/certificates/kube-etcd.pem
+    - ../../../files/certificates/kube-etcd-key.pem
+    - ../../../files/certificates/kube-etcd-peer.pem
+    - ../../../files/certificates/kube-etcd-peer-key.pem
+    - ../../../files/certificates/kube-etcd-healthcheck-client.pem
+    - ../../../files/certificates/kube-etcd-healthcheck-client-key.pem
 
-- name: Configure etcd.service
+- name: Deploy a unit file
   template:
     src: etcd.service.j2
     dest: /etc/systemd/system/etcd.service
+    mode: "0755"
 
-- name: Run etcd service
+- name: Restart etcd
   systemd:
     name: etcd
     state: restarted
     enabled: true
     daemon_reload: true
   register: result
-
-- name: Gather services
-  service_facts:
-
-- name: Verify etcd service
-  fail:
-    msg: 'etcd is not running!!!'
-  when: ansible_facts["services"]["etcd.service"].state != "running"
+  failed_when: not result.state == "started"

@@ -1,48 +1,33 @@
 ---
-- name: Check if a kube-controller-manager exists
-  stat:
-    path: /usr/local/bin/kube-controller-manager
-  register: kube_controller_manager_register
-
-- name: Download kube-controller-manager
-  get_url:
-    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-controller-manager
-    dest: /usr/local/bin/kube-controller-manager
-    mode: 0755
-  when: not kube_controller_manager_register.stat.exists
-
-- name: Create /var/lib/kubernetes
+- name: Create a directory
   file:
-    path: /var/lib/kubernetes
     state: directory
-    mode: 0600
-  register: remote_var_lib_kubernetes
+    path: /var/lib/kubernetes
+    mode: "0755"
 
-- name: Copy kubeconfig
+- name: Deploy kube-controller-manager
+  get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-controller-manager"
+    dest: /usr/local/bin/kube-controller-manager
+    mode: "0755"
+
+- name: Deploy a kubeconfig file
   copy:
-    src: "{{ item }}"
-    dest: "{{ remote_var_lib_kubernetes.path }}"
-    mode: 0600
-  with_list:
-    - ../../../files/kube-controller-manager.kubeconfig
+    src: ../../../files/kubeconfigs/kube-controller-manager.kubeconfig
+    dest: /var/lib/kubernetes/kube-controller-manager.kubeconfig
+    mode: "0600"
 
-- name: Configure kube-controller-manager.service
+- name: Deploy a unit file
   template:
     src: kube-controller-manager.service.j2
     dest: /etc/systemd/system/kube-controller-manager.service
+    mode: "0755"
 
-- name: Run kube-controller-manager service
+- name: Restart kube-controller-manager service
   systemd:
     name: kube-controller-manager
     state: restarted
     enabled: true
     daemon_reload: true
   register: result
-
-- name: Gather service
-  service_facts:
-
-- name: Verify kube-controller-manager service
-  fail:
-    msg: 'kube-controller-manager is not running!!!'
-  when: ansible_facts["services"]["kube-controller-manager.service"].state != "running"
+  failed_when: not result.state == "started"
