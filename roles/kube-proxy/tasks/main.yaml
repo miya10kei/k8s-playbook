@@ -1,0 +1,39 @@
+---
+- name: Create a directory
+  file:
+    state: directory
+    path: /var/lib/kube-proxy
+    mode: "0755"
+
+- name: Download kube-proxy
+  get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}64/kube-proxy"
+    dest: /usr/local/bin/kube-proxy
+    mode: "0755"
+
+- name: Deploy a kubeconfig file
+  copy:
+    src: ../../../files/kubeconfigs/kube-proxy.kubeconfig
+    dest: /var/lib/kube-proxy/kubeconfig
+    mode: "0600"
+
+- name: Deploy a kube-proxy configuration file
+  template:
+    src: kube-proxy-config.yaml
+    dest: /var/lib/kube-proxy/kube-proxy-config.yaml
+    mode: "0744"
+
+- name: Deploy a unit file
+  copy:
+    src: kube-proxy.service
+    dest: /etc/systemd/system/kube-proxy.service
+    mode: "0755"
+
+- name: Restar kube-proxy
+  systemd:
+    name: kube-proxy
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+  failed_when: not result.state == "started"

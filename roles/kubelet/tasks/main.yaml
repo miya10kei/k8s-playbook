@@ -1,0 +1,103 @@
+---
+- name: Create directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/cni/net.d
+    - /etc/containerd
+    - /opt/cni/bin
+    - /var/lib/kubelet
+    - /var/lib/kubernetes
+
+- name: Deploy a certificate and a key
+  copy:
+    src: "{{ item }}"
+    dest: /var/lib/kubelet/
+    mode: "0600"
+  loop:
+    - ../../../files/certificates/{{ hostname }}.pem
+    - ../../../files/certificates/{{ hostname }}-key.pem
+
+- name: Deploy a kubeconfig file
+  copy:
+    src: ../../../files/kubeconfigs/{{ hostname }}.kubeconfig
+    dest: /var/lib/kubelet/kubeconfig
+    mode: "0600"
+
+- name: Deploy a certificate
+  copy:
+    src: ../../../files/certificates/kubernetes-ca.pem
+    dest: /var/lib/kubernetes/
+    mode: "0600"
+
+- name: Deploy kubelet
+  get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}64/kubelet"
+    dest: /usr/local/bin/kubelet
+    mode: "0755"
+
+- name: Deploy crictl
+  unarchive:
+    src: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v{{ crictl_version }}/crictl-v{{ crictl_version }}-linux-{{ arch }}64.tar.gz"
+    dest: /usr/local/bin/
+    mode: "0755"
+    owner: root
+    group: root
+    remote_src: "yes"
+
+- name: Deploy cni plugins
+  unarchive:
+    src: "https://github.com/containernetworking/plugins/releases/download/v{{ cni_plugins_version }}/cni-plugins-linux-{{ arch }}64-v{{ cni_plugins_version }}.tgz"
+    dest: /opt/cni/bin/
+    mode: "0755"
+    owner: root
+    group: root
+    remote_src: "yes"
+
+- name: Install containerd & runc
+  apt:
+    update_cache: "yes"
+    name:
+      - containerd
+      - runc
+
+- name: Deploy a cni bridge configuration file
+  template:
+    src: 10-bridge.conf.j2
+    dest: /etc/cni/net.d/10-bridge.conf
+    mode: "0744"
+
+- name: Deploy a cni loopback configuration file
+  copy:
+    src: 99-loopback.conf
+    dest: /etc/cni/net.d/99-loopback.conf
+    mode: "0744"
+
+- name: Deploy a containerd configuration file
+  copy:
+    src: config.toml
+    dest: /etc/containerd/config.toml
+    mode: "0744"
+
+- name: Deploy a kubelet configuration file
+  template:
+    src: kubelet-config.yaml.j2
+    dest: /var/lib/kubelet/kubelet-config.yaml
+    mode: "0744"
+
+- name: Deploy a unit file kubelet.service
+  copy:
+    src: kubelet.service
+    dest: /etc/systemd/system/kubelet.service
+    mode: "0755"
+
+- name: Restart kubelet
+  systemd:
+    name: kubelet
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+  failed_when: not result.state == "started"

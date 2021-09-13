@@ -1,0 +1,33 @@
+---
+- name: Create a directory
+  file:
+    state: directory
+    path: /var/lib/kubernetes
+    mode: "0755"
+
+- name: Deploy kube-controller-manager
+  get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-controller-manager"
+    dest: /usr/local/bin/kube-controller-manager
+    mode: "0755"
+
+- name: Deploy a kubeconfig file
+  copy:
+    src: ../../../files/kubeconfigs/kube-controller-manager.kubeconfig
+    dest: /var/lib/kubernetes/kube-controller-manager.kubeconfig
+    mode: "0600"
+
+- name: Deploy a unit file
+  template:
+    src: kube-controller-manager.service.j2
+    dest: /etc/systemd/system/kube-controller-manager.service
+    mode: "0755"
+
+- name: Restart kube-controller-manager service
+  systemd:
+    name: kube-controller-manager
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+  failed_when: not result.state == "started"

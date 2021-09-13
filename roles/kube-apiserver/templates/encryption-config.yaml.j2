@@ -1,0 +1,13 @@
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: wA+jo8Mxo4yvBEdtUXQ8fvU0u6A0M6kbwtDqcK8emEQ=
+#              secret: {{ secret_register.stdout }}
+      - identity: {}
+

@@ -1,4 +1,0 @@
----
-arch: amd64
-node_ip: "127.0.0.1"
-hostname: "{{ ansible_facts.hostname }}"

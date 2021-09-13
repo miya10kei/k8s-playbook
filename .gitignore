@@ -1,1 +1,3 @@
 *.pem
+*.kubeconfig
+roles/kube-apiserver/templates/encryption-config.yaml.j2

@@ -1,9 +1,43 @@
 ---
-- name: Create k8s cluster
+- name: Upgrade packages
+  hosts: k8s_cluster
+  become: true
+  roles:
+    - role: debian
+      tags:
+        - maintenance
+
+- name: Create k8s master
   hosts: k8s_master
   become: true
   roles:
     - role: etcd
       tags:
         - etcd
+        - masters
+    - role: kube-apiserver
+      tags:
+        - kube-apiserver
+        - masters
+    - role: kube-controller-manager
+      tags:
+        - kube-controller-manager
+        - masters
+    - role: kube-scheduler
+      tags:
+        - kube-scheduler
+        - masters
 
+- name: Create k8s worker
+  hosts: k8s_worker
+  become: true
+  roles:
+    - role: worker
+      tags:
+        - worker
+    - role: kubelet
+      tags:
+        - kubelet
+    - role: kube-proxy
+      tags:
+        - kube-proxy

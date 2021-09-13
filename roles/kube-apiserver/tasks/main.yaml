@@ -1,0 +1,54 @@
+---
+- name: Create a directory
+  file:
+    state: directory
+    path: /var/lib/kubernetes
+    mode: "0755"
+
+- name: Deploy kube-apiserver
+  get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ kubernetes_version }}/bin/linux/{{ arch }}/kube-apiserver"
+    dest: /usr/local/bin/kube-apiserver
+    mode: "0755"
+
+- name: Deploy certificates and private keys
+  copy:
+    src: "{{ item }}"
+    dest: /var/lib/kubernetes/
+    mode: "0600"
+  loop:
+    - ../../../files/certificates/kubernetes-ca.pem
+    - ../../../files/certificates/kubernetes-ca-key.pem
+    - ../../../files/certificates/kube-apiserver-etcd-client-key.pem
+    - ../../../files/certificates/kube-apiserver-etcd-client.pem
+    - ../../../files/certificates/kube-apiserver-kubelet-client.pem
+    - ../../../files/certificates/kube-apiserver-kubelet-client-key.pem
+    - ../../../files/certificates/service-account.pem
+    - ../../../files/certificates/service-account-key.pem
+    - ../../../files/certificates/kube-apiserver.pem
+    - ../../../files/certificates/kube-apiserver-key.pem
+
+- name: Generate secret
+  shell: head -c 32 /dev/urandom | base64
+  register: secret_register
+
+- name: Deploy a encryption configuration file
+  template:
+    src: encryption-config.yaml.j2
+    dest: /var/lib/kubernetes/encryption-config.yaml
+    mode: "0600"
+
+- name: Deploy a unit file
+  template:
+    src: kube-apiserver.service.j2
+    dest: /etc/systemd/system/kube-apiserver.service
+    mode: "0755"
+
+- name: Restart kube-apiserver
+  systemd:
+    name: kube-apiserver
+    state: restarted
+    enabled: true
+    daemon_reload: true
+  register: result
+  failed_when: not result.state == "started"
